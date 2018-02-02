@@ -14,7 +14,7 @@ namespace AutoSpriteDistributer{
         /// </summary>
         private static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
         {
-            if (PlayerPrefs.GetInt("AutoSpriteDistributer_Enable_Auto_Set_Tag", 0) == 0) return;
+            if (PlayerPrefs.GetInt("AutoSpriteDistributer_Enable_Auto_Export_Reference", 0) == 0) return;
             string spriteDirPath = PlayerPrefs.GetString("AutoSpriteDistributer_Export_ScriptableObjects_Root_Directory");
             HashSet<string> importAndDeletePathes = new HashSet<string>(importedAssets);
             for (int i = 0; i < deletedAssets.Length; ++i)
