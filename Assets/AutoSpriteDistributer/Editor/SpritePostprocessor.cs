@@ -9,34 +9,30 @@ using UnityEditor;
 namespace AutoSpriteDistributer{
     public class SpritePostprocessor : AssetPostprocessor
     {
-        //対象のディレクトリへのパス
-        private const string SpriteDirectoryPath = "Assets/Sprites/";
-
-        // SpriteDBがある場所
-        private const string SpriteDBDirectoryPath = "Assets/ScriptableObjects/SpriteTagdbs/";
-
         /// <summary>
-        /// <para>ファイルが編集、追加、削除されたら、importバーが完了した後に呼ばれる</para>
+        /// <para>Once the file has been edited, added, deleted, it will be called after the import will be completed.</para>
         /// </summary>
         private static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
         {
+            string spriteDirPath = PlayerPrefs.GetString("AutoSpriteDistributer_Export_ScriptableObjects_Root_Directory");
             HashSet<string> importAndDeletePathes = new HashSet<string>(importedAssets);
             for (int i = 0; i < deletedAssets.Length; ++i)
             {
                 importAndDeletePathes.Add(deletedAssets[i]);
             }
-            if (importAndDeletePathes.Count > 0 && Array.Exists(importAndDeletePathes.ToArray(), path => path.Contains(SpriteDirectoryPath)))
+            if (importAndDeletePathes.Count > 0 && Array.Exists(importAndDeletePathes.ToArray(), path => path.Contains(spriteDirPath)))
             {
-                BuildSpriteDB();
+                BuildSpritesScriptableObject();
             }
         }
 
         /// <summary>
-        /// <para>Textureファイルのインポート設定 Textureファイルがインポートされる直前(importバーが表示される前)に呼び出される</para>
+        /// <para>Called just before the texture file is imported.</para>
         /// </summary>
         private void OnPreprocessTexture()
         {
-            if (!this.assetImporter.assetPath.Contains(SpriteDirectoryPath))
+            string spriteDirPath = PlayerPrefs.GetString("AutoSpriteDistributer_Export_ScriptableObjects_Root_Directory");
+            if (!this.assetImporter.assetPath.Contains(spriteDirPath))
             {
                 return;
             }
@@ -44,15 +40,16 @@ namespace AutoSpriteDistributer{
         }
 
         /// <summary>
-        /// <para>SpritePackerでPackingするためにSprite以下に存在するSprite全てをフォルダ名でTagを自動的につけちゃう</para>
+        /// <para>Automatically add tags by folder name to all Sprites</para>
         /// </summary>
         public static void ReimportAllSprite()
         {
+            string spriteDirPath = PlayerPrefs.GetString("AutoSpriteDistributer_Export_ScriptableObjects_Root_Directory");
             string[] pathes = AssetDatabase.GetAllAssetPaths();
             for (int i = 0; i < pathes.Length; ++i)
             {
                 string path = pathes[i];
-                if (path.Contains(SpriteDirectoryPath))
+                if (path.Contains(spriteDirPath))
                 {
                     AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
                 }
@@ -60,20 +57,21 @@ namespace AutoSpriteDistributer{
         }
 
         /// <summary>
-        /// <para>Spriteを参照して、Tagに対応したSpriteDBを作る</para>
+        /// <para>Refer to sprite and create the ScriptableObject correspond to the tag</para>
         /// </summary>
-        public static void BuildSpriteDB()
+        public static void BuildSpritesScriptableObject()
         {
             string[] pathes = AssetDatabase.GetAllAssetPaths();
+            string spriteDirPath = PlayerPrefs.GetString("AutoSpriteDistributer_Export_ScriptableObjects_Root_Directory");
 
-            HashSet<string> currentDbFilepathes = new HashSet<string>(Directory.GetFiles(SpriteDBDirectoryPath));
+            HashSet<string> currentsoFilepathes = new HashSet<string>(Directory.GetFiles(PlayerPrefs.GetString("AutoSpriteDistributer_Export_ScriptableObjects_Root_Directory")));
 
             Dictionary<string, HashSet<Sprite>> tagSprites = new Dictionary<string, HashSet<Sprite>>();
 
             for (int i = 0; i < pathes.Length; ++i)
             {
-                string path = pathes[i];
-                Match match = Regex.Match(path, @"" + SpriteDirectoryPath + ".+.png");
+                string path = pathes[i].ToLower();
+                Match match = Regex.Match(path, @"" + spriteDirPath + ".+.(png|jpg|jpeg)");
                 if (match.Success)
                 {
                     TextureImporter spriteImporter = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -87,86 +85,76 @@ namespace AutoSpriteDistributer{
                     }
                 }
             }
-            List<UnityScriptableObject> spritedbs = new List<UnityScriptableObject>();
+            List<UnityScriptableObject> spritesos = new List<UnityScriptableObject>();
 
             List<string> spriteTags = tagSprites.Keys.ToList();
             AssetDatabase.StartAssetEditing();
             for (int i = 0; i < spriteTags.Count; ++i)
             {
                 string tag = spriteTags[i];
-                UnityScriptableObject spriteDB = LoadOrCreateSpriteDb(tag);
+                UnityScriptableObject spriteScriptableObject = LoadOrCreateSpriteScriptableObject(tag);
                 List<Sprite> sps = tagSprites[tag].ToList();
                 sps.Sort((a, b) => string.Compare(a.name, b.name));
-                spriteDB.SetObjects(sps.ToArray());
-                spritedbs.Add(spriteDB);
-                // 現在存在するタグのDBファイルは残し続けるため、削除候補から除外する
-                currentDbFilepathes.RemoveWhere(dbPath => dbPath.Contains(tag));
+                spriteScriptableObject.SetObjects(sps.ToArray());
+                spritesos.Add(spriteScriptableObject);
+                // Since the asset file of the existing tag is kept, it is excluded from the deletion candidate
+                currentsoFilepathes.RemoveWhere(soPath => soPath.Contains(tag));
             }
-            spritedbs.Sort((a, b) => string.Compare(a.name, b.name));
-            // 使われていないAssetDBファイルは消し飛ばす
-            List<string> deleteFilePathes = currentDbFilepathes.ToList();
+            spritesos.Sort((a, b) => string.Compare(a.name, b.name));
+            // Delete unused Asset files
+            List<string> deleteFilePathes = currentsoFilepathes.ToList();
             for (int i = 0; i < deleteFilePathes.Count; ++i)
             {
                 File.Delete(deleteFilePathes[i]);
             }
             AssetDatabase.StopAssetEditing();
-            //変更をUnityEditorに伝える//
-            for (int i = 0; i < spritedbs.Count; ++i)
+            //Call the changes to UnityEditor
+            for (int i = 0; i < spritesos.Count; ++i)
             {
-                EditorUtility.SetDirty(spritedbs[i]);
+                EditorUtility.SetDirty(spritesos[i]);
             }
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log(tagSprites.Sum(ts => ts.Value.Count) + " Sprites were imported.");
         }
 
-        private static UnityScriptableObject LoadOrCreateSpriteDb(string tag)
+        private static UnityScriptableObject LoadOrCreateSpriteScriptableObject(string tag)
         {
-            string spriteDBFilePath = SpriteDBDirectoryPath + tag + ".asset";
-            UnityScriptableObject spriteDB = AssetDatabase.LoadAssetAtPath(spriteDBFilePath, typeof(UnityScriptableObject)) as UnityScriptableObject;
-            if (spriteDB == null)
+            string spriteAssetFilePath = PlayerPrefs.GetString("AutoSpriteDistributer_Export_ScriptableObjects_Root_Directory") + tag + ".asset";
+            UnityScriptableObject spriteScriptableObject = AssetDatabase.LoadAssetAtPath(spriteAssetFilePath, typeof(UnityScriptableObject)) as UnityScriptableObject;
+            if (spriteScriptableObject == null)
             {
-                spriteDB = ScriptableObject.CreateInstance<UnityScriptableObject>();
-                AssetDatabase.CreateAsset(spriteDB, spriteDBFilePath);
+                spriteScriptableObject = ScriptableObject.CreateInstance<UnityScriptableObject>();
+                AssetDatabase.CreateAsset(spriteScriptableObject, spriteAssetFilePath);
             }
-            return spriteDB;
+            return spriteScriptableObject;
         }
 
-        //SpritePackerでPackingできるように対象の(Importした)Textureの状態を更新する
+        //Edit the setting to be imported texture file so that it can be packed with SpritePacker.
         private void UpdatePackingSpriteInfo()
         {
-            //インポート時のTextureファイルを設定するクラス
+            string spriteDirPath = PlayerPrefs.GetString("AutoSpriteDistributer_Export_ScriptableObjects_Root_Directory");
+            //Class to set Texture file on import.
             TextureImporter textureImporter = this.assetImporter as TextureImporter;
-            //対象のディレクトリ以外はスルー
-            if (!textureImporter.assetPath.Contains(SpriteDirectoryPath) || !string.IsNullOrEmpty(textureImporter.spritePackingTag))
+            //Ignore others except the target directories.
+            if (!textureImporter.assetPath.Contains(spriteDirPath) || !string.IsNullOrEmpty(textureImporter.spritePackingTag))
             {
                 return;
             }
 
-            //親のディレクトリ名取得
+            //Get the parent directory name
             string directoryName = Path.GetFileName(Path.GetDirectoryName(textureImporter.assetPath));
 
-            //テクスチャの設定
-            textureImporter.textureType = TextureImporterType.Sprite; //テクスチャタイプをSpriteに
+            //setting the texture
+            textureImporter.textureType = TextureImporterType.Sprite; //change textureType to Sprite
 
-            //SliceしていないテクスチャのみPackingTagを付加する
+            //Add only PackingTag for textures not sliced.
             Vector4 borderVec = textureImporter.spriteBorder;
             bool slice = (borderVec.magnitude > 0f) ? true : false;
             if (!slice)
-                textureImporter.spritePackingTag = directoryName;              //タグをディレクトリ名に設定
-
-            //圧縮用ディレクトリかそうじゃないかでフォーマットを変える
-            //if(directoryName.Contains("Compressed")){
-            //  textureImporter.textureFormat = TextureImporterFormat.AutomaticCompressed;
-            //}
-            //else{
-            //  textureImporter.textureFormat = TextureImporterFormat.AutomaticTruecolor;
-            //}
-
-            //その他の設定
-            //textureImporter.mipmapEnabled       = false;            //MipMapを作成しないように
-            //textureImporter.spritePixelsPerUnit = 100;              //Pixels Per Unitを変更
-            //textureImporter.filterMode          = FilterMode.Point; //Filter ModeをPointに変更
+            {
+                textureImporter.spritePackingTag = directoryName;              //Set the tag by directory name
+            }
         }
     }
 }
