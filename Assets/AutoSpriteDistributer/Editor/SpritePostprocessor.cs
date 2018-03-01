@@ -11,6 +11,7 @@ namespace AutoSpriteDistributer{
     {
         public const string EnableAutomaticKey = "AutoSpriteDistributer_Enable_Automatic";
         public const string SpriteRootDirectoryKey = "AutoSpriteDistributer_Sprite_Root_Directory";
+        public const string ForceUpdateFlagKey = "AutoSpriteDistributer_Force_Update_Flag";
 
         /// <summary>
         /// <para>Called just before the texture file is imported.</para>
@@ -29,8 +30,9 @@ namespace AutoSpriteDistributer{
         /// <summary>
         /// <para>The texture file convert to sprite and add tag by folder name to all Sprites</para>
         /// </summary>
-        public static void ConvertAndAttachAllSprite()
+        public static void ConvertAndAttachAllSprite(bool overwriteTag = false)
         {
+            List<TextureImporter> importList = new List<TextureImporter>();
             string spriteDirPath = PlayerPrefs.GetString(SpriteRootDirectoryKey);
             string[] pathes = AssetDatabase.GetAllAssetPaths();
             for (int i = 0; i < pathes.Length; ++i)
@@ -40,10 +42,20 @@ namespace AutoSpriteDistributer{
                 {
                     TextureImporter importer = TextureImporter.GetAtPath(path) as TextureImporter;
                     if(importer != null){
+                        if(!overwriteTag && !string.IsNullOrEmpty(importer.spritePackingTag))
+                        {
+                            continue;
+                        }
                         ConvertSpriteAndAttachTag(importer);
+                        importList.Add(importer);
                     }
                 }
             }
+            for (int i = 0; i < importList.Count; ++i)
+            {
+                EditorUtility.SetDirty(importList[i]);
+            }
+            AssetDatabase.Refresh();
         }
 
         //Edit the setting to be imported texture file so that it can be packed with SpritePacker.

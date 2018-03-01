@@ -5,8 +5,8 @@ namespace AutoSpriteDistributer
 {
     public class CustomizeConfigEditor : EditorWindow
     {
-        private int enableAutoSetTag = 0;
-        private int enableAutoExportSCriptableObject = 0;
+        private int enableAutoAttachTag = 0;
+        private int overwriteTagFlag = 0;
         private string spriteDirectoryPath = "Assets/AutoSpriteDistributer/Sprites/";
 
         [MenuItem("Tools/AutoSpriteDistributerConfig")]
@@ -19,12 +19,18 @@ namespace AutoSpriteDistributer
         {
             GUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Enable to automatically convert sprite file and attach sprite tag");
-            enableAutoSetTag = EditorGUILayout.Toggle(PlayerPrefs.GetInt(SpritePostprocessor.EnableAutomaticKey, 0) == 1) ? 1 : 0;
-            PlayerPrefs.SetInt(SpritePostprocessor.EnableAutomaticKey, enableAutoSetTag);
+            enableAutoAttachTag = EditorGUILayout.Toggle(PlayerPrefs.GetInt(SpritePostprocessor.EnableAutomaticKey, 0) == 1) ? 1 : 0;
+            PlayerPrefs.SetInt(SpritePostprocessor.EnableAutomaticKey, enableAutoAttachTag);
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Search Sprite File Root Directory");
+            EditorGUILayout.LabelField("Overwrite tag?");
+            overwriteTagFlag = EditorGUILayout.Toggle(PlayerPrefs.GetInt(SpritePostprocessor.ForceUpdateFlagKey, 0) == 1) ? 1 : 0;
+            PlayerPrefs.SetInt(SpritePostprocessor.ForceUpdateFlagKey, overwriteTagFlag);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Search texture files in root directory");
             spriteDirectoryPath = (string)EditorGUILayout.TextField(PlayerPrefs.GetString(SpritePostprocessor.SpriteRootDirectoryKey, spriteDirectoryPath));
             UnityEngine.Object spriteDirectoryObject = EditorGUILayout.ObjectField(AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(spriteDirectoryPath), typeof(UnityEngine.Object), false);
             if(spriteDirectoryObject != null){
@@ -33,11 +39,11 @@ namespace AutoSpriteDistributer
             PlayerPrefs.SetString(SpritePostprocessor.SpriteRootDirectoryKey, spriteDirectoryPath);
             GUILayout.EndHorizontal();
 
-            if(enableAutoSetTag == 0){
+            if(enableAutoAttachTag == 0){
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button(new GUIContent("Convert And Attach")))
                 {
-                    SpritePostprocessor.ConvertAndAttachAllSprite();
+                    SpritePostprocessor.ConvertAndAttachAllSprite(overwriteTagFlag == 1);
                 }
                 GUILayout.EndHorizontal();
             }
