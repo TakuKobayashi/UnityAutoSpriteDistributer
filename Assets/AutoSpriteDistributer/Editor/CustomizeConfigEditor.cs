@@ -26,6 +26,10 @@ namespace AutoSpriteDistributer
             GUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Search Sprite File Root Directory");
             spriteDirectoryPath = (string)EditorGUILayout.TextField(PlayerPrefs.GetString(SpritePostprocessor.SpriteRootDirectoryKey, spriteDirectoryPath));
+            UnityEngine.Object spriteDirectoryObject = EditorGUILayout.ObjectField(AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(spriteDirectoryPath), typeof(UnityEngine.Object), false);
+            if(spriteDirectoryObject != null){
+                spriteDirectoryPath = AssetDatabase.GetAssetPath(spriteDirectoryObject);
+            }
             PlayerPrefs.SetString(SpritePostprocessor.SpriteRootDirectoryKey, spriteDirectoryPath);
             GUILayout.EndHorizontal();
 
