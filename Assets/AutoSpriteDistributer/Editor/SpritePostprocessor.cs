@@ -46,15 +46,21 @@ namespace AutoSpriteDistributer{
                         {
                             continue;
                         }
-                        ConvertSpriteAndAttachTag(importer);
                         importList.Add(importer);
                     }
                 }
             }
+            AssetDatabase.StartAssetEditing();
+            for (int i = 0; i < importList.Count; ++i)
+            {
+                ConvertSpriteAndAttachTag(importList[i]);
+            }
+            AssetDatabase.StopAssetEditing();
             for (int i = 0; i < importList.Count; ++i)
             {
                 EditorUtility.SetDirty(importList[i]);
             }
+            AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
 
